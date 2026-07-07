@@ -83,6 +83,7 @@
   <section id="screen-library" class="screen library hidden">
     <header class="topbar">
       <h2>Biblioteca de memes</h2>
+      <img class="topbar-logo" src="logo.png" alt="Kazoo" onerror="this.style.display='none'" />
       <div class="topbar-actions">
         <span id="owner-badge" class="owner-badge hidden">KAZOO</span>
         <button id="lib-lock" class="lock-btn" title="Acceso Kazoo">🔒</button>
@@ -131,6 +132,31 @@
       <div class="win-emoji">✓</div>
       <p class="win-name"></p>
       <p class="win-sub">Gana la actividad</p>
+    </div>
+  </div>
+
+  <!-- Modal contraseña (dueño) -->
+  <div id="pass-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>Acceso Kazoo</h3>
+      <p class="muted small">Escribe tu contraseña de dueño.</p>
+      <input id="pass-input" type="password" placeholder="Contraseña" />
+      <div class="modal-actions">
+        <button id="pass-cancel" class="ghost-btn">Cancelar</button>
+        <button id="pass-ok" class="big-btn small">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal confirmar (borrar / salir) -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="confirm-title">¿Estás seguro?</h3>
+      <p id="confirm-text" class="muted small">Esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="ghost-btn">Cancelar</button>
+        <button id="confirm-ok" class="big-btn small">Aceptar</button>
+      </div>
     </div>
   </div>
 

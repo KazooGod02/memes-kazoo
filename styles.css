@@ -90,7 +90,7 @@ body{
 .card h2{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.5px}
 .card-head{display:flex;align-items:center;gap:10px;margin-bottom:18px}
 .card-head h2{margin:0}
-input[type=text],input[type=url]{width:100%;background:transparent;
+input[type=text],input[type=url],input[type=password]{width:100%;background:transparent;
   border:none;border-bottom:1.5px solid var(--line);color:#fff;
   border-radius:0;padding:13px 2px;font-size:16px;margin-top:14px;outline:none;
   font-family:var(--font);transition:border-color .25s var(--ease)}
@@ -125,6 +125,11 @@ input:focus{border-color:var(--fg)}
   border-bottom:1px solid var(--line-soft);position:sticky;top:0;background:rgba(0,0,0,.85);
   backdrop-filter:blur(6px);z-index:5}
 .topbar h2{font-size:16px;margin:0;flex:1;font-weight:800;letter-spacing:-.3px}
+.topbar-logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  height:30px;width:auto;pointer-events:none;animation:logoGlow 2.4s ease-in-out infinite}
+@keyframes logoGlow{
+  0%,100%{filter:drop-shadow(0 0 2px rgba(255,255,255,.35))}
+  50%{filter:drop-shadow(0 0 14px rgba(255,255,255,.95)) drop-shadow(0 0 4px rgba(255,255,255,.8))}}
 .topbar-actions{display:flex;align-items:center;gap:8px}
 .topbar .lock-btn{position:static}
 .back-btn{background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 4px;opacity:.8;transition:.2s}
@@ -239,8 +244,9 @@ input:focus{border-color:var(--fg)}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
 
 /* ---------- modal ---------- */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;
-  justify-content:center;z-index:40;padding:20px;animation:fadeIn .2s}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;z-index:40;padding:20px;animation:fadeIn .2s}
 .modal-box{background:#0a0a0a;border:1px solid var(--line);border-radius:16px;padding:24px;
   width:100%;max-width:400px;animation:scaleIn .25s var(--ease)}
 .modal-box h3{margin:0 0 6px;font-size:18px;font-weight:800}

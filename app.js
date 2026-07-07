@@ -245,7 +245,9 @@ function askDelete(id) {
   const m = MEMES.find((x) => x.id === id);
   if (!m) return;
   if (!(m.userId === USER_ID || isOwner())) return toast("Solo puedes borrar tus memes.");
-  if (confirm("¿Borrar este meme?")) store.remove(m).then(() => toast("Meme borrado"));
+  openConfirm("¿Borrar este meme?", "Esta acción no se puede deshacer.", "Borrar", () => {
+    store.remove(m).then(() => toast("Meme borrado"));
+  });
 }
 
 let editingId = null;
@@ -391,17 +393,47 @@ function resetUploadForm() {
 /* ============================================================
    7. Modo dueño (Kazoo)
    ============================================================ */
+/* modal de confirmación genérico (borrar / salir) */
+let confirmCallback = null;
+function openConfirm(title, text, okText, onOk) {
+  $("#confirm-title").textContent = title;
+  $("#confirm-text").textContent = text || "";
+  $("#confirm-ok").textContent = okText || "Aceptar";
+  confirmCallback = onOk;
+  $("#confirm-modal").classList.remove("hidden");
+}
+function closeConfirm() { $("#confirm-modal").classList.add("hidden"); confirmCallback = null; }
+$("#confirm-cancel").onclick = closeConfirm;
+$("#confirm-ok").onclick = () => { const cb = confirmCallback; closeConfirm(); if (cb) cb(); };
+
+/* modal de contraseña de dueño */
 function promptOwner() {
-  if (isOwner()) { if (confirm("Ya estás en modo Kazoo. ¿Salir del modo dueño?")) { localStorage.removeItem(LS.owner); refreshOwnerUI(); renderLibrary(); toast("Modo dueño desactivado"); } return; }
-  const pass = prompt("Contraseña de Kazoo:");
-  if (pass == null) return;
-  if (pass === OWNER_PASSWORD) {
+  if (isOwner()) {
+    openConfirm("¿Salir del modo Kazoo?", "Volverás a verlo como un usuario normal.", "Salir", () => {
+      localStorage.removeItem(LS.owner); refreshOwnerUI(); renderLibrary(); toast("Modo dueño desactivado");
+    });
+    return;
+  }
+  $("#pass-input").value = "";
+  $("#pass-modal").classList.remove("hidden");
+  setTimeout(() => $("#pass-input").focus(), 60);
+}
+function submitPass() {
+  if ($("#pass-input").value === OWNER_PASSWORD) {
     localStorage.setItem(LS.owner, "1");
+    $("#pass-modal").classList.add("hidden");
     refreshOwnerUI(); renderLibrary();
     toast("Bienvenido, Kazoo");
     goLibrary();
-  } else toast("Contraseña incorrecta");
+  } else {
+    toast("Contraseña incorrecta");
+    $("#pass-input").value = "";
+    $("#pass-input").focus();
+  }
 }
+$("#pass-ok").onclick = submitPass;
+$("#pass-cancel").onclick = () => $("#pass-modal").classList.add("hidden");
+$("#pass-input").addEventListener("keydown", (e) => { if (e.key === "Enter") submitPass(); });
 $("#dot-lock").onclick = promptOwner;
 $("#lib-lock").onclick = promptOwner;
 
