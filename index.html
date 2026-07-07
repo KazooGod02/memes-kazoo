@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
 
@@ -51,18 +51,17 @@
       </div>
 
       <div class="type-tabs">
-        <button class="type-tab active" data-type="video">Video</button>
-        <button class="type-tab" data-type="image">Imagen</button>
+        <button class="type-tab active" data-type="file">Fotos y videos</button>
         <button class="type-tab" data-type="link">Link</button>
       </div>
 
-      <!-- archivo -->
+      <!-- archivos (uno o varios) -->
       <div id="file-zone" class="upload-zone">
-        <input id="file-input" type="file" accept="video/*" hidden />
+        <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
         <label for="file-input" class="drop-label">
           <span class="drop-icon">⬆️</span>
-          <span id="drop-text">Elegir video</span>
-          <span class="muted small">Máx 50 MB</span>
+          <span id="drop-text">Elegir fotos o videos</span>
+          <span class="muted small">Puedes elegir varios · máx 50 MB c/u</span>
         </label>
         <div id="file-preview" class="preview hidden"></div>
       </div>
@@ -194,6 +193,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=4"></script>
+  <script type="module" src="app.js?v=5"></script>
 </body>
 </html>

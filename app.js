@@ -365,81 +365,109 @@ function goLibrary() { showScreen("library"); refreshOwnerUI(); }
 /* ============================================================
    6. Formulario de subida
    ============================================================ */
-let currentType = "video";
-let currentFile = null;
+let currentType = "file";
+let currentFiles = [];
 
 $$(".type-tab").forEach((tab) => tab.onclick = () => {
   $$(".type-tab").forEach((t) => t.classList.remove("active"));
   tab.classList.add("active");
   currentType = tab.dataset.type;
-  currentFile = null;
+  currentFiles = [];
+  $("#file-input").value = "";
   $("#file-preview").classList.add("hidden");
   $("#file-preview").innerHTML = "";
-  const fileI = $("#file-input");
   if (currentType === "link") {
     $("#file-zone").classList.add("hidden");
     $("#link-zone").classList.remove("hidden");
   } else {
     $("#file-zone").classList.remove("hidden");
     $("#link-zone").classList.add("hidden");
-    fileI.accept = currentType === "video" ? "video/*" : "image/*";
-    $("#drop-text").textContent = currentType === "video" ? "Elegir video" : "Elegir imagen";
   }
 });
 
 $("#file-input").addEventListener("change", (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  if (f.size > 50 * 1024 * 1024) { toast("Máximo 50 MB"); e.target.value = ""; return; }
-  currentFile = f;
-  const url = URL.createObjectURL(f);
+  const files = [...e.target.files];
+  currentFiles = [];
+  let tooBig = 0;
+  for (const f of files) {
+    if (f.size > 50 * 1024 * 1024) { tooBig++; continue; }
+    currentFiles.push(f);
+  }
+  if (tooBig) toast(`${tooBig} archivo(s) de más de 50 MB se omitieron`);
   const prev = $("#file-preview");
-  prev.innerHTML = currentType === "video"
-    ? `<video src="${url}" controls playsinline></video>`
-    : `<img src="${url}" alt="preview" />`;
+  if (!currentFiles.length) { prev.classList.add("hidden"); prev.innerHTML = ""; return; }
+
+  const extra = currentFiles.length - 12;
+  const count = document.createElement("div");
+  count.className = "multi-count";
+  count.textContent = `${currentFiles.length} seleccionado${currentFiles.length > 1 ? "s" : ""}` +
+    (currentFiles.length > 1 ? " · se subirán por separado" : "") + (extra > 0 ? ` (mostrando 12)` : "");
+  const grid = document.createElement("div");
+  grid.className = "multi-preview";
+  currentFiles.slice(0, 12).forEach((f) => {
+    const url = URL.createObjectURL(f);
+    grid.insertAdjacentHTML("beforeend",
+      (f.type || "").startsWith("video") ? `<video src="${url}" muted></video>` : `<img src="${url}" alt="" />`);
+  });
+  prev.innerHTML = "";
+  prev.append(count, grid);
   prev.classList.remove("hidden");
 });
 
 $("#upload-btn").onclick = async () => {
   const caption = $("#caption-input").value.trim();
   const userName = getUserName();
-  let meme = { type: currentType, caption, userName };
-  let file = null;
+  const btn = $("#upload-btn");
+  const prog = $("#upload-progress");
+  const bar = prog.querySelector(".bar");
+  const pct = prog.querySelector(".pct");
 
+  // ----- LINK (uno) -----
   if (currentType === "link") {
     const link = $("#link-input").value.trim();
     if (!link) return toast("Pega un link");
     try { new URL(link); } catch { return toast("Link no válido"); }
-    meme.url = link;
-  } else {
-    if (!currentFile) return toast(`Elige ${currentType === "video" ? "un video" : "una imagen"}`);
-    file = currentFile;
+    btn.disabled = true; btn.textContent = "ENVIANDO...";
+    try {
+      await store.add({ type: "link", url: link, caption, userName });
+      resetUploadForm(); toast("¡Meme enviado! 🎉"); goLibrary();
+    } catch (err) { console.error(err); toast("Error al enviar. Revisa tu conexión."); }
+    finally { btn.disabled = false; btn.textContent = "ENVIAR MEME"; }
+    return;
   }
 
-  const btn = $("#upload-btn");
-  btn.disabled = true; btn.textContent = "ENVIANDO...";
-  const prog = $("#upload-progress");
-  if (file) prog.classList.remove("hidden");
+  // ----- ARCHIVOS (uno o varios) = posts separados -----
+  if (!currentFiles.length) return toast("Elige al menos una foto o video");
+  const files = currentFiles.slice();
+  const total = files.length;
+  btn.disabled = true;
+  prog.classList.remove("hidden");
+  let done = 0, ok = 0, fail = 0;
 
-  try {
-    await store.add(meme, file, (p) => {
-      prog.querySelector(".bar").style.width = Math.round(p * 100) + "%";
-      prog.querySelector(".pct").textContent = Math.round(p * 100) + "%";
-    });
-    resetUploadForm();
-    toast("¡Meme enviado! 🎉");
-    goLibrary();
-  } catch (err) {
-    console.error(err);
-    toast("Error al enviar. Revisa tu conexión / Firebase.");
-  } finally {
-    btn.disabled = false; btn.textContent = "ENVIAR MEME";
-    prog.classList.add("hidden"); prog.querySelector(".bar").style.width = "0%";
+  for (const f of files) {
+    const type = (f.type || "").startsWith("image") ? "image" : "video";
+    btn.textContent = total > 1 ? `SUBIENDO ${done + 1}/${total}...` : "ENVIANDO...";
+    try {
+      await store.add({ type, caption, userName }, f, (p) => {
+        bar.style.width = Math.round(((done + p) / total) * 100) + "%";
+        pct.textContent = `${done + (p >= 1 ? 1 : 0)}/${total}`;
+      });
+      ok++;
+    } catch (err) { console.error(err); fail++; }
+    done++;
+    bar.style.width = Math.round((done / total) * 100) + "%";
+    pct.textContent = `${done}/${total}`;
   }
+
+  resetUploadForm();
+  btn.disabled = false; btn.textContent = "ENVIAR MEME";
+  prog.classList.add("hidden"); bar.style.width = "0%";
+  toast(fail ? `${ok} enviado(s), ${fail} fallaron` : total > 1 ? `¡${ok} memes enviados! 🎉` : "¡Meme enviado! 🎉");
+  goLibrary();
 };
 
 function resetUploadForm() {
-  currentFile = null;
+  currentFiles = [];
   $("#file-input").value = "";
   $("#link-input").value = "";
   $("#caption-input").value = "";
