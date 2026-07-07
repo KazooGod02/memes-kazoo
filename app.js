@@ -154,18 +154,40 @@ store.subscribe((list) => { MEMES = list; renderLibrary(); refreshOwnerUI(); });
 
 function mediaHTML(m, cover = true) {
   if (m.type === "image") return `<img src="${m.url}" alt="meme" />`;
-  if (m.type === "video") return `<video src="${m.url}" ${cover ? "muted playsinline" : "controls playsinline"}></video>`;
+  if (m.type === "video") {
+    // en la biblioteca: silenciado; en review: autoplay
+    return cover
+      ? `<video src="${m.url}" muted playsinline preload="metadata"></video>`
+      : `<video src="${m.url}" playsinline loop autoplay controls></video>`;
+  }
   // link
-  const embed = toEmbed(m.url);
-  if (embed && !cover) return `<iframe src="${embed}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+  const embed = toEmbed(m.url, !cover);
+  if (embed && !cover) return `<iframe src="${embed}" allowfullscreen allow="autoplay; encrypted-media; fullscreen" scrolling="no"></iframe>`;
   return `<div class="link-card"><span class="lk-ico">🔗</span><a href="${m.url}" target="_blank" rel="noopener">${shorten(m.url)}</a></div>`;
 }
 function shorten(u){ try{ return new URL(u).hostname.replace("www.",""); }catch(e){ return u.slice(0,40); } }
-function toEmbed(u) {
+function toEmbed(u, autoplay) {
   try {
     const url = new URL(u);
-    if (url.hostname.includes("youtube.com") && url.searchParams.get("v")) return `https://www.youtube.com/embed/${url.searchParams.get("v")}`;
-    if (url.hostname === "youtu.be") return `https://www.youtube.com/embed/${url.pathname.slice(1)}`;
+    const h = url.hostname.replace("www.", "");
+    const ap = autoplay ? "?autoplay=1&mute=1&playsinline=1&rel=0" : "?rel=0";
+    // YouTube
+    if (h.includes("youtube.com")) {
+      if (url.searchParams.get("v")) return `https://www.youtube.com/embed/${url.searchParams.get("v")}${ap}`;
+      if (url.pathname.startsWith("/shorts/")) return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}${ap}`;
+      if (url.pathname.startsWith("/embed/")) return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}${ap}`;
+    }
+    if (h === "youtu.be") return `https://www.youtube.com/embed/${url.pathname.slice(1)}${ap}`;
+    // TikTok
+    if (h.includes("tiktok.com")) {
+      const mm = url.pathname.match(/\/video\/(\d+)/);
+      if (mm) return `https://www.tiktok.com/embed/v2/${mm[1]}`;
+    }
+    // Instagram
+    if (h.includes("instagram.com")) {
+      const mm = url.pathname.match(/\/(reel|p|tv)\/([^/]+)/);
+      if (mm) return `https://www.instagram.com/${mm[1]}/${mm[2]}/embed`;
+    }
   } catch (e) {}
   return null;
 }
@@ -179,11 +201,11 @@ function renderLibrary() {
   grid.innerHTML = visible.map((m) => {
     const mine = m.userId === USER_ID;
     const canEdit = mine || owner;
-    const winTag = m.decision === "win" ? `<span class="win-tag">🏆 GANÓ</span>` : "";
+    const winTag = m.decision === "win" ? `<span class="win-tag">GANÓ</span>` : "";
     const actions = canEdit ? `
       <div class="actions">
-        <button data-edit="${m.id}">✏️ Editar</button>
-        <button class="del" data-del="${m.id}">🗑️ Borrar</button>
+        <button data-edit="${m.id}">Editar</button>
+        <button class="del" data-del="${m.id}">Borrar</button>
       </div>` : "";
     return `
       <div class="meme ${m.decision === "win" ? "won" : ""}" data-id="${m.id}">
@@ -376,7 +398,7 @@ function promptOwner() {
   if (pass === OWNER_PASSWORD) {
     localStorage.setItem(LS.owner, "1");
     refreshOwnerUI(); renderLibrary();
-    toast("👑 Bienvenido, Kazoo");
+    toast("Bienvenido, Kazoo");
     goLibrary();
   } else toast("Contraseña incorrecta");
 }
@@ -390,7 +412,7 @@ function refreshOwnerUI() {
   if (owner) {
     const winners = MEMES.filter((m) => m.decision === "win");
     $("#winners-line").innerHTML = winners.length
-      ? "🏆 Ganadores: " + winners.map((w) => escapeHtml(w.userName || "anónimo")).join(", ")
+      ? "Ganadores: <b>" + winners.map((w) => escapeHtml(w.userName || "anónimo")).join("</b>, <b>") + "</b>"
       : "";
   }
 }
@@ -427,7 +449,39 @@ function renderDeck() {
     </div>`;
   el.appendChild(card);
   enableDrag(card);
+  resetSides();
+
+  // reproducir el video ya: con sonido; si el navegador lo bloquea, silenciado
+  const vid = card.querySelector("video");
+  if (vid) {
+    vid.muted = false;
+    vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+  }
 }
+
+/* ---------- efecto de proximidad rojo/verde en los lados ---------- */
+const reviewStage = $("#review-stage");
+const sideLeft = $("#side-left"), sideRight = $("#side-right");
+const btnNoEl = $("#btn-no"), btnYesEl = $("#btn-yes");
+function setSides(l, r) {
+  sideLeft.style.opacity = l;
+  sideRight.style.opacity = r;
+  btnNoEl.style.transform = `translateY(-50%) scale(${1 + l * 0.28})`;
+  btnYesEl.style.transform = `translateY(-50%) scale(${1 + r * 0.28})`;
+  btnNoEl.style.borderColor = l > 0.06 ? "var(--red)" : "";
+  btnNoEl.style.color = l > 0.06 ? "var(--red)" : "";
+  btnYesEl.style.borderColor = r > 0.06 ? "var(--green)" : "";
+  btnYesEl.style.color = r > 0.06 ? "var(--green)" : "";
+}
+function resetSides() { setSides(0, 0); }
+reviewStage.addEventListener("mousemove", (e) => {
+  const rect = reviewStage.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;      // 0 (izq) .. 1 (der)
+  const l = Math.max(0, Math.min(1, (0.5 - ratio) / 0.5)); // mientras más a la izq, más rojo
+  const r = Math.max(0, Math.min(1, (ratio - 0.5) / 0.5)); // mientras más a la der, más verde
+  setSides(l, r);
+});
+reviewStage.addEventListener("mouseleave", resetSides);
 
 function enableDrag(card) {
   let startX = 0, dx = 0, dragging = false;
@@ -487,7 +541,7 @@ function launchConfetti(ov) {
     const c = document.createElement("i");
     c.className = "confetti";
     c.style.left = Math.random() * 100 + "%";
-    c.style.background = `hsl(${Math.random() * 360},90%,62%)`;
+    c.style.background = Math.random() < 0.25 ? "var(--green)" : `rgba(255,255,255,${0.6 + Math.random() * 0.4})`;
     c.style.animationDelay = Math.random() * 0.5 + "s";
     c.style.transform = `rotate(${Math.random() * 360}deg)`;
     ov.appendChild(c);

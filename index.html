@@ -6,22 +6,20 @@
   <title>Si me haces reír, ganas $20 USD</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- fondo animado -->
-  <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
-
   <!-- ===================== INTRO (solo 1 vez) ===================== -->
   <section id="screen-intro" class="screen intro">
     <div class="intro-inner">
-      <p class="intro-kicker l1">🎤 El reto de Kazoo</p>
+      <img id="intro-logo" class="intro-logo" src="logo.png" alt="Kazoo" onerror="this.style.display='none'" />
+      <p class="intro-kicker l1">El reto de Kazoo</p>
       <h1 class="intro-title l2">SI ME HACES<br>REÍR</h1>
-      <p class="intro-prize l3">GANAS <span id="prize-text">$20 USD</span> 💵</p>
+      <p class="intro-prize l3">GANAS <span id="prize-text">$20 USD</span></p>
       <p class="intro-line l4">Sube tu mejor meme en <b>video</b>, <b>imagen</b> o <b>link</b>.<br>¿Puedes sacarme una carcajada?</p>
-      <button id="intro-btn" class="big-btn l5">QUIERO GANAR</button>
+      <button id="intro-btn" class="big-btn l5">Quiero ganar</button>
     </div>
   </section>
 
@@ -53,9 +51,9 @@
       </div>
 
       <div class="type-tabs">
-        <button class="type-tab active" data-type="video">🎬 Video</button>
-        <button class="type-tab" data-type="image">🖼️ Imagen</button>
-        <button class="type-tab" data-type="link">🔗 Link</button>
+        <button class="type-tab active" data-type="video">Video</button>
+        <button class="type-tab" data-type="image">Imagen</button>
+        <button class="type-tab" data-type="link">Link</button>
       </div>
 
       <!-- archivo -->
@@ -86,13 +84,13 @@
     <header class="topbar">
       <h2>Biblioteca de memes</h2>
       <div class="topbar-actions">
-        <span id="owner-badge" class="owner-badge hidden">👑 Kazoo</span>
+        <span id="owner-badge" class="owner-badge hidden">KAZOO</span>
         <button id="lib-lock" class="lock-btn" title="Acceso Kazoo">🔒</button>
       </div>
     </header>
 
     <div id="owner-panel" class="owner-panel hidden">
-      <button id="start-review" class="review-btn">▶ EMPEZAR (solo para mí)</button>
+      <button id="start-review" class="review-btn">Empezar (solo para mí)</button>
       <div id="winners-line" class="winners-line"></div>
     </div>
 
@@ -102,35 +100,37 @@
     <button id="fab-add" class="fab" aria-label="Subir otro meme">+</button>
   </section>
 
-  <!-- ===================== MODO REVIEW (tinder, solo dueño) ===================== -->
+  <!-- ===================== MODO REVIEW (solo dueño) ===================== -->
   <section id="screen-review" class="screen review hidden">
     <header class="topbar">
       <button class="back-btn" data-goto="library">←</button>
-      <h2>¿Me haces reír? 😂</h2>
+      <h2>¿Me haces reír?</h2>
       <span id="review-count" class="muted"></span>
     </header>
 
-    <div id="deck" class="deck"></div>
+    <div id="review-stage" class="review-stage">
+      <div id="side-left" class="side left"></div>
+      <div id="side-right" class="side right"></div>
+      <button id="btn-no" class="side-btn no" title="No me rió">✕</button>
+      <button id="btn-yes" class="side-btn yes" title="Me rió → este gana">✓</button>
 
-    <div class="review-controls">
-      <button id="btn-no" class="round no">✕</button>
-      <button id="btn-yes" class="round yes">✓</button>
-    </div>
-    <p class="review-hint">✕ no me rió &nbsp;·&nbsp; ✓ me rió → este gana</p>
+      <div id="deck" class="deck"></div>
 
-    <div id="review-done" class="review-done hidden">
-      <h2>¡Listo! 🎉</h2>
-      <p>Revisaste todos los memes.</p>
-      <button class="big-btn" data-goto="library">Volver a la biblioteca</button>
+      <div id="review-done" class="review-done hidden">
+        <h2>¡Listo!</h2>
+        <p class="muted">Revisaste todos los memes.</p>
+        <button class="big-btn" data-goto="library">Volver</button>
+      </div>
     </div>
+    <p class="review-hint">← no me rió &nbsp;·&nbsp; me rió → gana →</p>
   </section>
 
   <!-- Overlay de ganador -->
   <div id="win-overlay" class="win-overlay hidden">
     <div class="win-box">
-      <div class="win-emoji">🏆</div>
+      <div class="win-emoji">✓</div>
       <p class="win-name"></p>
-      <p class="win-sub">¡GANA la actividad!</p>
+      <p class="win-sub">Gana la actividad</p>
     </div>
   </div>
 
