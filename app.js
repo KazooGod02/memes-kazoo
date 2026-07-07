@@ -216,7 +216,7 @@ function playerHTML(m) {
   const p = platformOf(m.url);
   if (p === "youtube") {
     const id = ytId(m.url);
-    if (id) return `<div class="embed-wrap yt"><iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>`;
+    if (id) return `<div class="embed-wrap yt"><iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&playsinline=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>`;
   }
   if (p === "tiktok") {
     const id = tiktokId(m.url);
