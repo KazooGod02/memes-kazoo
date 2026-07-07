@@ -1,0 +1,25 @@
+name: Sincronizar Discord
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # cada ~10 minutos
+  workflow_dispatch:          # botón para ejecutarlo a mano
+
+concurrency:
+  group: discord-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Ejecutar sincronización
+        run: node scripts/discord-sync.mjs
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
