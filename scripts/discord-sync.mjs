@@ -1,24 +1,31 @@
 // ============================================================
 //  Sincroniza un canal de Discord -> memes de la web
-//  (Firestore para datos, Cloudinary para archivos)
-//  Se ejecuta desde GitHub Actions cada ~10 min.
+//  Usa el MISMO SDK de Firebase que la web (reglas abiertas)
+//  + Cloudinary para los archivos. Corre desde GitHub Actions.
 // ============================================================
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 
-// --- valores públicos (ya están en config.js del repo) ---
-const FB_PROJECT = "memes-kazoo";
-const FB_KEY = "AIzaSyCkMaWCb6_KY-L_t4srnnMyN6dDxIcDY_0";
+// --- config pública (igual que config.js del repo) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCkMaWCb6_KY-L_t4srnnMyN6dDxIcDY_0",
+  authDomain: "memes-kazoo.firebaseapp.com",
+  projectId: "memes-kazoo",
+  storageBucket: "memes-kazoo.firebasestorage.app",
+  messagingSenderId: "414404319067",
+  appId: "1:414404319067:web:d07884a7ec8d08d3fa2c7e",
+};
 const CLOUD = "l2hcls7r";
 const PRESET = "memes_unsigned";
 
-// --- secretos (vienen de GitHub Actions) ---
+// --- secretos (GitHub Actions) ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL = process.env.DISCORD_CHANNEL_ID;
 
-// --- límites por corrida (para no exceder tiempo) ---
-const MAX_PAGES = 6;     // 6 x 100 = hasta 600 mensajes revisados por corrida
-const MAX_ITEMS = 40;    // sube como máx 40 memes por corrida (el resto en la siguiente)
+// --- límites por corrida ---
+const MAX_PAGES = 6;    // hasta 600 mensajes revisados por corrida
+const MAX_ITEMS = 40;   // hasta 40 memes subidos por corrida
 
-const FS = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 if (!TOKEN || !CHANNEL) {
@@ -26,11 +33,12 @@ if (!TOKEN || !CHANNEL) {
   process.exit(1);
 }
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 /* ---------- Discord ---------- */
 async function dget(path) {
-  const r = await fetch(`https://discord.com/api/v10${path}`, {
-    headers: { Authorization: `Bot ${TOKEN}` },
-  });
+  const r = await fetch(`https://discord.com/api/v10${path}`, { headers: { Authorization: `Bot ${TOKEN}` } });
   if (r.status === 429) {
     const j = await r.json().catch(() => ({}));
     const wait = (j.retry_after || 1) * 1000 + 250;
@@ -49,7 +57,6 @@ async function fetchNewMessages(afterId) {
     const batch = await dget(`/channels/${CHANNEL}/messages?limit=100&after=${after}`);
     if (!batch.length) break;
     out.push(...batch);
-    // el lote viene del más nuevo al más viejo -> avanzamos con el id más alto
     after = batch.map((m) => m.id).reduce((a, b) => (BigInt(a) > BigInt(b) ? a : b));
     if (batch.length < 100) break;
     await sleep(400);
@@ -58,17 +65,15 @@ async function fetchNewMessages(afterId) {
   return out;
 }
 
-/* ---------- extraer medios de un mensaje ---------- */
+/* ---------- extraer medios ---------- */
 const VIDEO_LINK = /(youtube\.com|youtu\.be|tiktok\.com|instagram\.com)/i;
 const URL_RE = /https?:\/\/[^\s<>()]+/g;
-
 function kindByName(name = "") {
   const n = name.toLowerCase();
   if (/\.(mp4|mov|webm|mkv|avi|m4v)$/.test(n)) return "video";
   if (/\.(png|jpe?g|gif|webp|bmp)$/.test(n)) return "image";
   return null;
 }
-
 function itemsFromMessage(msg) {
   const items = [];
   for (const a of msg.attachments || []) {
@@ -83,7 +88,6 @@ function itemsFromMessage(msg) {
   for (const u of urls) if (VIDEO_LINK.test(u)) items.push({ kind: "link", src: u });
   return items;
 }
-
 function captionOf(msg) {
   return (msg.content || "").replace(URL_RE, "").replace(/\s+/g, " ").trim().slice(0, 140);
 }
@@ -102,61 +106,29 @@ async function cloudinaryUpload(fileUrl) {
   return j.secure_url;
 }
 
-/* ---------- Firestore REST (reglas abiertas) ---------- */
-const sv = (s) => ({ stringValue: String(s) });
-const bv = (b) => ({ booleanValue: !!b });
-const tv = (iso) => ({ timestampValue: iso });
-const nv = () => ({ nullValue: null });
-
-async function fsGet(path) {
-  const r = await fetch(`${FS}/${path}?key=${FB_KEY}`);
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`Firestore GET ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  return r.json();
-}
-
+/* ---------- Firestore (SDK, reglas abiertas) ----------
+   El puntero se guarda en memes/_discord_state SIN campo createdAt,
+   así la web (que ordena por createdAt) nunca lo muestra. */
+const STATE_DOC = doc(db, "memes", "_discord_state");
 async function loadState() {
-  const doc = await fsGet("sync/discord");
-  return doc?.fields?.lastMessageId?.stringValue || "";
+  const snap = await getDoc(STATE_DOC);
+  return snap.exists() ? snap.data().lastMessageId || "" : "";
 }
 async function saveState(lastMessageId) {
-  const r = await fetch(`${FS}/sync/discord?key=${FB_KEY}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: { lastMessageId: sv(lastMessageId), updatedAt: tv(new Date().toISOString()) } }),
-  });
-  if (!r.ok) throw new Error(`Firestore state ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  await setDoc(STATE_DOC, { lastMessageId, updatedAt: Timestamp.now() });
 }
-
 async function loadExistingDiscordIds() {
   const set = new Set();
-  let pageToken = "";
-  do {
-    const url = `${FS}/memes?key=${FB_KEY}&pageSize=300&mask.fieldPaths=discordId` + (pageToken ? `&pageToken=${pageToken}` : "");
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`Firestore list ${r.status}: ${(await r.text()).slice(0, 200)}`);
-    const j = await r.json();
-    for (const d of j.documents || []) {
-      const id = d.fields?.discordId?.stringValue;
-      if (id) set.add(id);
-    }
-    pageToken = j.nextPageToken || "";
-  } while (pageToken);
+  const snap = await getDocs(collection(db, "memes"));
+  snap.forEach((d) => { const id = d.data().discordId; if (id) set.add(id); });
   return set;
 }
-
-async function createMeme(doc) {
-  const r = await fetch(`${FS}/memes?key=${FB_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: {
-      userId: sv(doc.userId), userName: sv(doc.userName), type: sv(doc.type),
-      url: sv(doc.url), storagePath: sv(""), caption: sv(doc.caption),
-      decision: nv(), reviewed: bv(false), createdAt: tv(doc.createdAt),
-      source: sv("discord"), discordId: sv(doc.discordId),
-    } }),
+async function createMeme(m) {
+  await addDoc(collection(db, "memes"), {
+    userId: `discord:${m.authorId}`, userName: m.userName, type: m.type, url: m.url,
+    storagePath: "", caption: m.caption, decision: null, reviewed: false,
+    createdAt: Timestamp.fromDate(new Date(m.createdAt)), source: "discord", discordId: m.discordId,
   });
-  if (!r.ok) throw new Error(`Firestore create ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
 
 /* ---------- main ---------- */
@@ -186,10 +158,7 @@ async function createMeme(doc) {
       if (existing.has(discordId)) { skipped++; continue; }
       try {
         const url = it.kind === "link" ? it.src : await cloudinaryUpload(it.src);
-        await createMeme({
-          userId: `discord:${msg.author.id}`, userName, type: it.kind, url,
-          caption, createdAt: msg.timestamp, discordId,
-        });
+        await createMeme({ authorId: msg.author.id, userName, type: it.kind, url, caption, createdAt: msg.timestamp, discordId });
         uploaded++;
         console.log(`+ ${it.kind} de ${userName} (${discordId})`);
       } catch (e) {
@@ -201,4 +170,4 @@ async function createMeme(doc) {
 
   if (lastProcessed && lastProcessed !== lastId) await saveState(lastProcessed);
   console.log(`Hecho. Subidos: ${uploaded}, ya existían: ${skipped}. Nuevo puntero: ${lastProcessed}`);
-})().catch((e) => { console.error("FALLO:", e); process.exit(1); });
+})().then(() => process.exit(0)).catch((e) => { console.error("FALLO:", e); process.exit(1); });
