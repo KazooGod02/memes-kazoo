@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Si me haces reír, ganas $20 USD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- fondo animado -->
+  <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <!-- ===================== INTRO (solo 1 vez) ===================== -->
+  <section id="screen-intro" class="screen intro">
+    <div class="intro-inner">
+      <p class="intro-kicker l1">🎤 El reto de Kazoo</p>
+      <h1 class="intro-title l2">SI ME HACES<br>REÍR</h1>
+      <p class="intro-prize l3">GANAS <span id="prize-text">$20 USD</span> 💵</p>
+      <p class="intro-line l4">Sube tu mejor meme en <b>video</b>, <b>imagen</b> o <b>link</b>.<br>¿Puedes sacarme una carcajada?</p>
+      <button id="intro-btn" class="big-btn l5">QUIERO GANAR</button>
+    </div>
+  </section>
+
+  <!-- ===================== PUNTO CON + ===================== -->
+  <section id="screen-dot" class="screen dot hidden">
+    <button id="dot-btn" class="dot-plus" aria-label="Subir meme">
+      <span>+</span>
+    </button>
+    <p class="dot-hint">Toca para subir tu meme</p>
+    <button id="dot-lock" class="lock-btn" title="Acceso Kazoo">🔒</button>
+  </section>
+
+  <!-- ===================== PEDIR NOMBRE (solo 1 vez) ===================== -->
+  <section id="screen-name" class="screen name hidden">
+    <div class="card">
+      <h2>¿Con qué nombre firmas?</h2>
+      <p class="muted">Así sabremos quién ganó. Se pregunta una sola vez.</p>
+      <input id="name-input" type="text" maxlength="24" placeholder="Tu nombre o apodo" />
+      <button id="name-btn" class="big-btn">CONTINUAR</button>
+    </div>
+  </section>
+
+  <!-- ===================== SUBIR MEME ===================== -->
+  <section id="screen-upload" class="screen upload hidden">
+    <div class="card">
+      <div class="card-head">
+        <button class="back-btn" data-goto="library">←</button>
+        <h2 id="upload-title">Sube tu meme</h2>
+      </div>
+
+      <div class="type-tabs">
+        <button class="type-tab active" data-type="video">🎬 Video</button>
+        <button class="type-tab" data-type="image">🖼️ Imagen</button>
+        <button class="type-tab" data-type="link">🔗 Link</button>
+      </div>
+
+      <!-- archivo -->
+      <div id="file-zone" class="upload-zone">
+        <input id="file-input" type="file" accept="video/*" hidden />
+        <label for="file-input" class="drop-label">
+          <span class="drop-icon">⬆️</span>
+          <span id="drop-text">Elegir video</span>
+          <span class="muted small">Máx 50 MB</span>
+        </label>
+        <div id="file-preview" class="preview hidden"></div>
+      </div>
+
+      <!-- link -->
+      <div id="link-zone" class="upload-zone hidden">
+        <input id="link-input" type="url" placeholder="Pega el link (YouTube, TikTok, etc.)" />
+      </div>
+
+      <input id="caption-input" type="text" maxlength="80" placeholder="Título o comentario (opcional)" />
+
+      <button id="upload-btn" class="big-btn">ENVIAR MEME</button>
+      <div id="upload-progress" class="progress hidden"><div class="bar"></div><span class="pct">0%</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== BIBLIOTECA ===================== -->
+  <section id="screen-library" class="screen library hidden">
+    <header class="topbar">
+      <h2>Biblioteca de memes</h2>
+      <div class="topbar-actions">
+        <span id="owner-badge" class="owner-badge hidden">👑 Kazoo</span>
+        <button id="lib-lock" class="lock-btn" title="Acceso Kazoo">🔒</button>
+      </div>
+    </header>
+
+    <div id="owner-panel" class="owner-panel hidden">
+      <button id="start-review" class="review-btn">▶ EMPEZAR (solo para mí)</button>
+      <div id="winners-line" class="winners-line"></div>
+    </div>
+
+    <div id="meme-grid" class="grid"></div>
+    <p id="empty-msg" class="empty hidden">Aún no hay memes. ¡Sé el primero! 👇</p>
+
+    <button id="fab-add" class="fab" aria-label="Subir otro meme">+</button>
+  </section>
+
+  <!-- ===================== MODO REVIEW (tinder, solo dueño) ===================== -->
+  <section id="screen-review" class="screen review hidden">
+    <header class="topbar">
+      <button class="back-btn" data-goto="library">←</button>
+      <h2>¿Me haces reír? 😂</h2>
+      <span id="review-count" class="muted"></span>
+    </header>
+
+    <div id="deck" class="deck"></div>
+
+    <div class="review-controls">
+      <button id="btn-no" class="round no">✕</button>
+      <button id="btn-yes" class="round yes">✓</button>
+    </div>
+    <p class="review-hint">✕ no me rió &nbsp;·&nbsp; ✓ me rió → este gana</p>
+
+    <div id="review-done" class="review-done hidden">
+      <h2>¡Listo! 🎉</h2>
+      <p>Revisaste todos los memes.</p>
+      <button class="big-btn" data-goto="library">Volver a la biblioteca</button>
+    </div>
+  </section>
+
+  <!-- Overlay de ganador -->
+  <div id="win-overlay" class="win-overlay hidden">
+    <div class="win-box">
+      <div class="win-emoji">🏆</div>
+      <p class="win-name"></p>
+      <p class="win-sub">¡GANA la actividad!</p>
+    </div>
+  </div>
+
+  <!-- Modal editar -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>Editar meme</h3>
+      <input id="edit-caption" type="text" maxlength="80" placeholder="Título / comentario" />
+      <input id="edit-link" type="url" placeholder="Link" class="hidden" />
+      <div class="modal-actions">
+        <button id="edit-cancel" class="ghost-btn">Cancelar</button>
+        <button id="edit-save" class="big-btn small">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
