@@ -152,44 +152,81 @@ function makeLocalStore() {
 let MEMES = [];
 store.subscribe((list) => { MEMES = list; renderLibrary(); refreshOwnerUI(); });
 
-function mediaHTML(m, cover = true) {
-  if (m.type === "image") return `<img src="${m.url}" alt="meme" />`;
-  if (m.type === "video") {
-    // en la biblioteca: silenciado; en review: autoplay
-    return cover
-      ? `<video src="${m.url}" muted playsinline preload="metadata"></video>`
-      : `<video src="${m.url}" playsinline loop autoplay controls></video>`;
-  }
-  // link
-  const embed = toEmbed(m.url, !cover);
-  if (embed && !cover) return `<iframe src="${embed}" allowfullscreen allow="autoplay; encrypted-media; fullscreen" scrolling="no"></iframe>`;
-  return `<div class="link-card"><span class="lk-ico">🔗</span><a href="${m.url}" target="_blank" rel="noopener">${shorten(m.url)}</a></div>`;
-}
-function shorten(u){ try{ return new URL(u).hostname.replace("www.",""); }catch(e){ return u.slice(0,40); } }
-function toEmbed(u, autoplay) {
+/* ---------- detección de plataforma ---------- */
+function platformOf(url) {
   try {
-    const url = new URL(u);
-    const h = url.hostname.replace("www.", "");
-    const ap = autoplay ? "?autoplay=1&mute=1&playsinline=1&rel=0" : "?rel=0";
-    // YouTube
-    if (h.includes("youtube.com")) {
-      if (url.searchParams.get("v")) return `https://www.youtube.com/embed/${url.searchParams.get("v")}${ap}`;
-      if (url.pathname.startsWith("/shorts/")) return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}${ap}`;
-      if (url.pathname.startsWith("/embed/")) return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}${ap}`;
-    }
-    if (h === "youtu.be") return `https://www.youtube.com/embed/${url.pathname.slice(1)}${ap}`;
-    // TikTok
-    if (h.includes("tiktok.com")) {
-      const mm = url.pathname.match(/\/video\/(\d+)/);
-      if (mm) return `https://www.tiktok.com/embed/v2/${mm[1]}`;
-    }
-    // Instagram
-    if (h.includes("instagram.com")) {
-      const mm = url.pathname.match(/\/(reel|p|tv)\/([^/]+)/);
-      if (mm) return `https://www.instagram.com/${mm[1]}/${mm[2]}/embed`;
-    }
+    const h = new URL(url).hostname.replace("www.", "");
+    if (h.includes("youtube") || h === "youtu.be") return "youtube";
+    if (h.includes("tiktok")) return "tiktok";
+    if (h.includes("instagram")) return "instagram";
+    return "web";
+  } catch (e) { return "web"; }
+}
+function ytId(url) {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.get("v")) return u.searchParams.get("v");
+    if (u.hostname.replace("www.", "") === "youtu.be") return u.pathname.slice(1);
+    const p = u.pathname.split("/");
+    const i = p.findIndex((s) => s === "shorts" || s === "embed");
+    if (i >= 0 && p[i + 1]) return p[i + 1];
   } catch (e) {}
   return null;
+}
+function tiktokId(url) { try { const m = new URL(url).pathname.match(/\/video\/(\d+)/); return m ? m[1] : null; } catch (e) { return null; } }
+function igParts(url) { try { const m = new URL(url).pathname.match(/\/(reel|p|tv)\/([^/]+)/); return m ? { kind: m[1], code: m[2] } : null; } catch (e) { return null; } }
+function shorten(u) { try { return new URL(u).hostname.replace("www.", ""); } catch (e) { return String(u).slice(0, 40); } }
+
+function isVideoLink(m) {
+  if (m.type !== "link") return false;
+  const p = platformOf(m.url);
+  if (p === "youtube" || p === "tiktok") return true;
+  if (p === "instagram") { const ig = igParts(m.url); return ig && ig.kind !== "p"; }
+  return false;
+}
+function typeEmoji(m) {
+  if (m.type === "image") return "🖼️";
+  if (m.type === "video") return "🎬";
+  return isVideoLink(m) ? "🎬" : "🔗";
+}
+function typeLabel(m) {
+  if (m.type === "image") return "Imagen";
+  if (m.type === "video") return "Video";
+  return platformOf(m.url) === "web" ? "Link" : (platformOf(m.url).charAt(0).toUpperCase() + platformOf(m.url).slice(1));
+}
+
+/* miniatura para la cuadrícula de la biblioteca */
+function thumbHTML(m) {
+  if (m.type === "image") return `<img src="${m.url}" alt="meme" loading="lazy" />`;
+  if (m.type === "video") return `<video src="${m.url}" muted playsinline preload="metadata"></video>`;
+  const p = platformOf(m.url);
+  if (p === "youtube") {
+    const id = ytId(m.url);
+    if (id) return `<img class="yt-thumb" src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="video" loading="lazy" onerror="this.outerHTML='<div class=&quot;link-card&quot;><span class=&quot;lk-ico&quot;>▶</span><span class=&quot;lk-name&quot;>YouTube</span></div>'" />`;
+  }
+  const name = p === "tiktok" ? "TikTok" : p === "instagram" ? "Instagram" : shorten(m.url);
+  const ico = isVideoLink(m) ? "▶" : "🔗";
+  return `<div class="link-card"><span class="lk-ico">${ico}</span><span class="lk-name">${escapeHtml(name)}</span></div>`;
+}
+
+/* reproductor grande para el detalle y el review */
+function playerHTML(m) {
+  if (m.type === "image") return `<img class="pl-media" src="${m.url}" alt="meme" />`;
+  if (m.type === "video") return `<video class="pl-media" src="${m.url}" controls autoplay loop playsinline></video>`;
+  const p = platformOf(m.url);
+  if (p === "youtube") {
+    const id = ytId(m.url);
+    if (id) return `<div class="embed-wrap yt"><iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>`;
+  }
+  if (p === "tiktok") {
+    const id = tiktokId(m.url);
+    if (id) return `<div class="embed-wrap vertical"><iframe src="https://www.tiktok.com/embed/v2/${id}" allow="autoplay; encrypted-media; fullscreen" scrolling="no" allowfullscreen></iframe></div>`;
+  }
+  if (p === "instagram") {
+    const ig = igParts(m.url);
+    if (ig) return `<div class="embed-wrap ${ig.kind === "p" ? "square" : "vertical"}"><iframe src="https://www.instagram.com/${ig.kind}/${ig.code}/embed" allow="autoplay; encrypted-media" scrolling="no"></iframe></div>`;
+  }
+  return `<div class="link-card big"><span class="lk-ico">🔗</span><a href="${m.url}" target="_blank" rel="noopener">${shorten(m.url)}</a></div>`;
 }
 
 function renderLibrary() {
@@ -210,10 +247,13 @@ function renderLibrary() {
     return `
       <div class="meme ${m.decision === "win" ? "won" : ""}" data-id="${m.id}">
         ${winTag}
-        <div class="media" data-open="${m.id}">${mediaHTML(m, true)}</div>
+        <div class="media" data-open="${m.id}">
+          <span class="type-badge">${typeEmoji(m)}</span>
+          ${thumbHTML(m)}
+        </div>
         <div class="info">
           <div class="by">por ${escapeHtml(m.userName || "anónimo")}${mine ? " (tú)" : ""}</div>
-          ${m.caption ? `<div class="cap">${escapeHtml(m.caption)}</div>` : ""}
+          <div class="cap">${m.caption ? escapeHtml(m.caption) : ""}</div>
         </div>
         ${actions}
       </div>`;
@@ -231,12 +271,29 @@ $("#meme-grid").addEventListener("click", (e) => {
   if (open) return openMeme(open.dataset.open);
 });
 
+/* ---------- vista de detalle (lightbox) ---------- */
 function openMeme(id) {
   const m = MEMES.find((x) => x.id === id);
   if (!m) return;
-  if (m.type === "link") window.open(m.url, "_blank", "noopener");
-  else if (m.type === "video") { const v = document.querySelector(`.meme[data-id="${id}"] video`); if (v) { v.muted = false; v.paused ? v.play() : v.pause(); } }
+  $("#view-media").className = "view-media " + (m.type === "link" ? "type-" + platformOf(m.url) : "type-" + m.type);
+  $("#view-media").innerHTML = `<span class="type-badge">${typeEmoji(m)}</span>` + playerHTML(m);
+  $("#view-badge").textContent = `${typeEmoji(m)} ${typeLabel(m)}`;
+  $("#view-by").textContent = m.userName || "anónimo";
+  $("#view-cap").textContent = m.caption || "";
+  $("#view-cap").style.display = m.caption ? "" : "none";
+  const openBtn = $("#view-open");
+  if (m.type === "link") { openBtn.style.display = ""; openBtn.onclick = () => window.open(m.url, "_blank", "noopener"); }
+  else { openBtn.style.display = "none"; }
+  $("#view-modal").classList.remove("hidden");
+  const vid = $("#view-media").querySelector("video");
+  if (vid) { vid.muted = false; vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); }); }
 }
+function closeView() {
+  $("#view-modal").classList.add("hidden");
+  $("#view-media").innerHTML = ""; // detiene video/iframe
+}
+$("#view-close").onclick = closeView;
+$("#view-modal").addEventListener("click", (e) => { if (e.target.id === "view-modal") closeView(); });
 
 /* ============================================================
    4. Borrar / Editar
@@ -471,10 +528,11 @@ function renderDeck() {
   const m = deck[0];
   const card = document.createElement("div");
   card.className = "rcard";
+  card.className = "rcard type-" + (m.type === "link" ? platformOf(m.url) : m.type);
   card.innerHTML = `
     <div class="stamp like">ME RÍO</div>
     <div class="stamp nope">AGUANTÉ</div>
-    <div class="rmedia">${mediaHTML(m, false)}</div>
+    <div class="rmedia"><span class="type-badge">${typeEmoji(m)}</span>${playerHTML(m)}</div>
     <div class="rinfo">
       <div class="by">${escapeHtml(m.userName || "anónimo")}</div>
       ${m.caption ? `<div class="cap">${escapeHtml(m.caption)}</div>` : ""}
