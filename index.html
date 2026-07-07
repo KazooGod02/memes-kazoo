@@ -7,14 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
 
   <!-- ===================== INTRO (solo 1 vez) ===================== -->
   <section id="screen-intro" class="screen intro">
     <div class="intro-inner">
-      <img id="intro-logo" class="intro-logo" src="logo.png" alt="Kazoo" onerror="this.style.display='none'" />
+      <img id="intro-logo" class="intro-logo" src="logo.png" alt="Kazoo" style="max-width:110px;max-height:110px" onerror="this.style.display='none'" />
       <p class="intro-kicker l1">El reto de Kazoo</p>
       <h1 class="intro-title l2">SI ME HACES<br>REÍR</h1>
       <p class="intro-prize l3">GANAS <span id="prize-text">$20 USD</span></p>
@@ -83,7 +83,7 @@
   <section id="screen-library" class="screen library hidden">
     <header class="topbar">
       <h2>Biblioteca de memes</h2>
-      <img class="topbar-logo" src="logo.png" alt="Kazoo" onerror="this.style.display='none'" />
+      <img class="topbar-logo" src="logo.png" alt="Kazoo" style="max-height:32px;width:auto" onerror="this.style.display='none'" />
       <div class="topbar-actions">
         <span id="owner-badge" class="owner-badge hidden">KAZOO</span>
         <button id="lib-lock" class="lock-btn" title="Acceso Kazoo">🔒</button>
@@ -175,6 +175,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2"></script>
 </body>
 </html>
