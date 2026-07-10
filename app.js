@@ -577,8 +577,19 @@ function setStage(stage) {
   const roundUI = stage === "round";
   $("#btn-no").classList.toggle("hidden", !roundUI);
   $("#btn-yes").classList.toggle("hidden", !roundUI);
-  document.querySelector(".review-hint").classList.toggle("hidden", !roundUI);
+  document.querySelector(".review-bottom").classList.toggle("hidden", !roundUI);
 }
+
+function shuffleArr(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+$("#shuffle-btn").onclick = () => {
+  if (!tourney || tourney.stage !== "round" || tourney.busy) return;
+  shuffleArr(tourney.queue);
+  showRoundCard();
+  toast("Memes barajados 🔀");
+};
 
 function showRoundCard() {
   if (!tourney.queue.length) return finishRound();
@@ -750,19 +761,32 @@ function onStageClick(e) {
 $("#pick-stage").addEventListener("click", onStageClick);
 $("#final-stage").addEventListener("click", onStageClick);
 
+function podCol(m, place) {
+  if (!m) return "";
+  const medal = place === 1 ? "🥇" : place === 2 ? "🥈" : "🥉";
+  const label = place === 1 ? "1er lugar" : place === 2 ? "2º lugar" : "3er lugar";
+  return `
+    <div class="pcol c${place}" data-view="${m.id}">
+      <div class="pmedal">${medal}</div>
+      <div class="pthumb"><span class="type-badge">${typeEmoji(m)}</span>${thumbHTML(m)}</div>
+      <div class="pname">${escapeHtml(m.userName || "anónimo")}</div>
+      <div class="pbar">${label}</div>
+    </div>`;
+}
+
 async function finishTournament() {
   setStage("done");
   $("#review-count").textContent = "";
   const { first, second, third } = tourney.podium;
   $("#review-done").innerHTML = `
     <h2>🏆 Podio</h2>
-    <div class="podium">
-      ${first ? `<div class="pod p1"><span class="medal">🥇</span><b>${escapeHtml(first.userName || "anónimo")}</b><span class="pod-tag">1er lugar</span></div>` : ""}
-      ${second ? `<div class="pod p2"><span class="medal">🥈</span><b>${escapeHtml(second.userName || "anónimo")}</b><span class="pod-tag">2º</span></div>` : ""}
-      ${third ? `<div class="pod p3"><span class="medal">🥉</span><b>${escapeHtml(third.userName || "anónimo")}</b><span class="pod-tag">3º</span></div>` : ""}
-    </div>
+    <p class="stage-sub muted">Toca un meme para verlo.</p>
+    <div class="podium3">${podCol(second, 2)}${podCol(first, 1)}${podCol(third, 3)}</div>
     <button class="big-btn">Volver a la biblioteca</button>`;
   $("#review-done .big-btn").onclick = () => goLibrary();
+  $("#review-done").querySelectorAll("[data-view]").forEach((el) => {
+    el.onclick = () => openMeme(el.dataset.view);
+  });
   if (first) showWin(first.userName);
   await persistPodium();
 }
