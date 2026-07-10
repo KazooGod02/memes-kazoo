@@ -11,6 +11,11 @@ export const OWNER_PASSWORD = "kazoo0209";
 // 2) EL PREMIO que se muestra en el intro
 export const PRIZE = "$20 USD";
 
+// 2b) FECHA LÍMITE del reto (el contador llega a 0 aquí).
+//     Está en hora del Pacífico. En julio el Pacífico es PDT (UTC-7).
+//     Formato: "AAAA-MM-DDTHH:MM:SS-07:00"
+export const DEADLINE = "2026-07-10T17:00:00-07:00"; // viernes 10 jul, 5:00 PM Pacífico
+
 // 3) CLAVES DE FIREBASE (Firestore) — guarda los DATOS de los memes
 //    Mientras esto tenga "PEGA_AQUI", la app corre en MODO DEMO
 //    (los memes se guardan solo en TU navegador, sirve para probar).

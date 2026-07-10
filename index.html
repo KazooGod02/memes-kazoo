@@ -4,10 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Si me haces reír, ganas $20 USD</title>
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
 
@@ -19,6 +21,7 @@
       <h1 class="intro-title l2">SI ME HACES<br>REÍR</h1>
       <p class="intro-prize l3">GANAS <span id="prize-text">$20 USD</span></p>
       <p class="intro-line l4">Sube tu mejor meme en <b>video</b>, <b>imagen</b> o <b>link</b>.<br>¿Puedes sacarme una carcajada?</p>
+      <div class="cd-box l4"><span class="cd-label">Cierra en</span><span class="cd-text" data-cd>—</span></div>
       <button id="intro-btn" class="big-btn l5">Quiero ganar</button>
     </div>
   </section>
@@ -89,6 +92,8 @@
       </div>
     </header>
 
+    <div class="cd-bar"><span class="cd-label">El reto cierra en</span> <span class="cd-text" data-cd>—</span></div>
+
     <div id="owner-panel" class="owner-panel hidden">
       <button id="start-review" class="review-btn">Empezar (solo para mí)</button>
       <div id="winners-line" class="winners-line"></div>
@@ -116,13 +121,16 @@
 
       <div id="deck" class="deck"></div>
 
+      <div id="pick-stage" class="pick-stage hidden"></div>
+      <div id="final-stage" class="final-stage hidden"></div>
+
       <div id="review-done" class="review-done hidden">
         <h2>¡Listo!</h2>
         <p class="muted">Revisaste todos los memes.</p>
         <button class="big-btn" data-goto="library">Volver</button>
       </div>
     </div>
-    <p class="review-hint">← no me rió &nbsp;·&nbsp; me rió → gana →</p>
+    <p class="review-hint">← no me rió &nbsp;·&nbsp; me rió → pasa de ronda →</p>
   </section>
 
   <!-- Overlay de ganador -->
@@ -193,6 +201,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=5"></script>
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>

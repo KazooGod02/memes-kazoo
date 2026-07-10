@@ -1,4 +1,4 @@
-import { firebaseConfig, OWNER_PASSWORD, PRIZE, CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "./config.js";
+import { firebaseConfig, OWNER_PASSWORD, PRIZE, DEADLINE, CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "./config.js";
 
 /* ============================================================
    0. Utilidades
@@ -238,14 +238,15 @@ function renderLibrary() {
   grid.innerHTML = visible.map((m) => {
     const mine = m.userId === USER_ID;
     const canEdit = mine || owner;
-    const winTag = m.decision === "win" ? `<span class="win-tag">GANÓ</span>` : "";
+    const medal = m.decision === "first" ? "🥇 1º" : m.decision === "second" ? "🥈 2º" : m.decision === "third" ? "🥉 3º" : m.decision === "win" ? "GANÓ" : "";
+    const winTag = medal ? `<span class="win-tag">${medal}</span>` : "";
     const actions = canEdit ? `
       <div class="actions">
         <button data-edit="${m.id}">Editar</button>
         <button class="del" data-del="${m.id}">Borrar</button>
       </div>` : "";
     return `
-      <div class="meme ${m.decision === "win" ? "won" : ""}" data-id="${m.id}">
+      <div class="meme ${(m.decision === "first" || m.decision === "win") ? "won" : ""}" data-id="${m.id}">
         ${winTag}
         <div class="media" data-open="${m.id}">
           <span class="type-badge">${typeEmoji(m)}</span>
@@ -527,40 +528,71 @@ function refreshOwnerUI() {
   $("#owner-badge").classList.toggle("hidden", !owner);
   $("#owner-panel").classList.toggle("hidden", !owner);
   if (owner) {
-    const winners = MEMES.filter((m) => m.decision === "win");
-    $("#winners-line").innerHTML = winners.length
-      ? "Ganadores: <b>" + winners.map((w) => escapeHtml(w.userName || "anónimo")).join("</b>, <b>") + "</b>"
-      : "";
+    const byDec = (d) => MEMES.find((m) => m.decision === d);
+    const first = byDec("first"), second = byDec("second"), third = byDec("third");
+    const legacy = MEMES.filter((m) => m.decision === "win");
+    const parts = [];
+    if (first) parts.push(`🥇 <b>${escapeHtml(first.userName || "anónimo")}</b>`);
+    if (second) parts.push(`🥈 ${escapeHtml(second.userName || "anónimo")}`);
+    if (third) parts.push(`🥉 ${escapeHtml(third.userName || "anónimo")}`);
+    if (!first && legacy.length) parts.push("Ganadores: " + legacy.map((w) => escapeHtml(w.userName || "anónimo")).join(", "));
+    $("#winners-line").innerHTML = parts.join(" &nbsp;·&nbsp; ");
   }
 }
 
 /* ============================================================
    8. Review mode (tinder, solo dueño)
    ============================================================ */
-let deck = [];
+let tourney = null;
+
 $("#start-review").onclick = () => {
   if (!isOwner()) return;
-  deck = MEMES.filter((m) => !m.reviewed).slice();
-  $("#review-done").classList.add("hidden");
-  showScreen("review");
-  renderDeck();
+  startTournament();
 };
 
-function renderDeck() {
+function startTournament() {
+  const pool = MEMES.slice();
+  tourney = { round: 1, pool, queue: [], survivors: [], lastEliminated: null, stage: "round", podium: {}, finalists: [], three: [] };
+  $("#review-done").classList.add("hidden");
+  showScreen("review");
+  if (pool.length === 0) { toast("No hay memes todavía"); return goLibrary(); }
+  if (pool.length === 1) { tourney.podium.first = pool[0]; return finishTournament(); }
+  beginRound(pool);
+}
+
+function beginRound(pool) {
+  if (pool.length <= 3) return enterEndgame(pool);
+  tourney.pool = pool;
+  tourney.queue = pool.slice();
+  tourney.survivors = [];
+  showRoundCard();
+}
+
+function setStage(stage) {
+  tourney.stage = stage;
+  $("#deck").classList.toggle("hidden", stage !== "round");
+  $("#pick-stage").classList.toggle("hidden", stage !== "pick3rd");
+  $("#final-stage").classList.toggle("hidden", stage !== "final");
+  $("#review-done").classList.toggle("hidden", stage !== "done");
+  const roundUI = stage === "round";
+  $("#btn-no").classList.toggle("hidden", !roundUI);
+  $("#btn-yes").classList.toggle("hidden", !roundUI);
+  document.querySelector(".review-hint").classList.toggle("hidden", !roundUI);
+}
+
+function showRoundCard() {
+  if (!tourney.queue.length) return finishRound();
+  setStage("round");
   const el = $("#deck");
   el.innerHTML = "";
-  $("#review-count").textContent = deck.length ? `${deck.length} por ver` : "";
-  if (!deck.length) { $("#review-done").classList.remove("hidden"); return; }
-
-  // solo la carta de arriba (primera) es interactiva
-  const m = deck[0];
+  const m = tourney.queue[0];
+  $("#review-count").textContent = `Ronda ${tourney.round} · ${tourney.queue.length} por ver`;
   const card = document.createElement("div");
-  card.className = "rcard";
   card.className = "rcard type-" + (m.type === "link" ? platformOf(m.url) : m.type);
   card.innerHTML = `
     <div class="stamp like">ME RÍO</div>
     <div class="stamp nope">AGUANTÉ</div>
-    <div class="rmedia"><span class="type-badge">${typeEmoji(m)}</span>${playerHTML(m)}</div>
+    <div class="rmedia"><span class="type-badge">${typeEmoji(m)}</span>${playerHTML(m)}<div class="drag-layer" title="Arrástrame"></div></div>
     <div class="rinfo">
       <div class="by">${escapeHtml(m.userName || "anónimo")}</div>
       ${m.caption ? `<div class="cap">${escapeHtml(m.caption)}</div>` : ""}
@@ -568,13 +600,8 @@ function renderDeck() {
   el.appendChild(card);
   enableDrag(card);
   resetSides();
-
-  // reproducir el video ya: con sonido; si el navegador lo bloquea, silenciado
   const vid = card.querySelector("video");
-  if (vid) {
-    vid.muted = false;
-    vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); });
-  }
+  if (vid) { vid.muted = false; vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); }); }
 }
 
 /* ---------- efecto de proximidad rojo/verde en los lados ---------- */
@@ -593,6 +620,7 @@ function setSides(l, r) {
 }
 function resetSides() { setSides(0, 0); }
 reviewStage.addEventListener("mousemove", (e) => {
+  if (!tourney || tourney.stage !== "round") return;
   const rect = reviewStage.getBoundingClientRect();
   const ratio = (e.clientX - rect.left) / rect.width;      // 0 (izq) .. 1 (der)
   const l = Math.max(0, Math.min(1, (0.5 - ratio) / 0.5)); // mientras más a la izq, más rojo
@@ -612,16 +640,17 @@ function enableDrag(card) {
     card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
     like.style.opacity = dx > 0 ? Math.min(dx / 100, 1) : 0;
     nope.style.opacity = dx < 0 ? Math.min(-dx / 100, 1) : 0;
+    setSides(dx < 0 ? Math.min(-dx / 140, 1) : 0, dx > 0 ? Math.min(dx / 140, 1) : 0);
   };
   const onUp = () => {
     if (!dragging) return;
     dragging = false;
-    if (dx > 110) decide("win", card);
-    else if (dx < -110) decide("skip", card);
-    else { card.style.transform = ""; like.style.opacity = 0; nope.style.opacity = 0; }
+    if (dx > 100) roundDecide(true, card);
+    else if (dx < -100) roundDecide(false, card);
+    else { card.style.transform = ""; like.style.opacity = 0; nope.style.opacity = 0; resetSides(); }
     dx = 0;
   };
-  card.addEventListener("mousedown", (e) => onDown(e.clientX));
+  card.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
   window.addEventListener("mousemove", (e) => onMove(e.clientX));
   window.addEventListener("mouseup", onUp);
   card.addEventListener("touchstart", (e) => onDown(e.touches[0].clientX), { passive: true });
@@ -629,21 +658,125 @@ function enableDrag(card) {
   card.addEventListener("touchend", onUp);
 }
 
-$("#btn-yes").onclick = () => { const c = $(".rcard"); if (c) decide("win", c); };
-$("#btn-no").onclick = () => { const c = $(".rcard"); if (c) decide("skip", c); };
+$("#btn-yes").onclick = () => { if (tourney && tourney.stage === "round") { const c = $(".rcard"); if (c) roundDecide(true, c); } };
+$("#btn-no").onclick = () => { if (tourney && tourney.stage === "round") { const c = $(".rcard"); if (c) roundDecide(false, c); } };
 
-async function decide(decision, card) {
-  const m = deck.shift();
-  if (!m) return;
-  // animación de salida
+function animateOut(card, keep) {
   card.style.transition = "transform .35s, opacity .35s";
-  card.style.transform = decision === "win" ? "translateX(140%) rotate(20deg)" : "translateX(-140%) rotate(-20deg)";
+  card.style.transform = keep ? "translateX(140%) rotate(20deg)" : "translateX(-140%) rotate(-20deg)";
   card.style.opacity = "0";
+}
 
-  await store.update(m.id, { reviewed: true, decision });
-  if (decision === "win") showWin(m.userName);
+function roundDecide(keep, card) {
+  if (!tourney || tourney.stage !== "round" || tourney.busy) return;
+  const m = tourney.queue.shift();
+  if (!m) return;
+  tourney.busy = true;
+  animateOut(card, keep);
+  if (keep) tourney.survivors.push(m); else tourney.lastEliminated = m;
+  resetSides();
+  setTimeout(() => {
+    tourney.busy = false;
+    tourney.queue.length ? showRoundCard() : finishRound();
+  }, 320);
+}
 
-  setTimeout(renderDeck, 320);
+function finishRound() {
+  const surv = tourney.survivors;
+  if (surv.length === 0) { toast("Elige al menos uno 😅"); return beginRound(tourney.pool); }
+  if (surv.length === tourney.pool.length) toast("No eliminaste ninguno; sigue quitando");
+  tourney.round++;
+  beginRound(surv);
+}
+
+/* ---------- endgame: 3er lugar y final ---------- */
+function miniCard(m, action) {
+  return `
+    <div class="vs-card" data-${action}="${m.id}">
+      <div class="vs-media"><span class="type-badge">${typeEmoji(m)}</span>${thumbHTML(m)}</div>
+      <div class="vs-info">
+        <div class="vs-name">${escapeHtml(m.userName || "anónimo")}</div>
+        ${m.caption ? `<div class="vs-cap">${escapeHtml(m.caption)}</div>` : ""}
+        <button class="vs-view ghost-btn small" data-view="${m.id}">Ver</button>
+      </div>
+    </div>`;
+}
+
+function enterEndgame(pool) {
+  if (pool.length === 1) { tourney.podium.first = pool[0]; return finishTournament(); }
+  if (pool.length === 2) {
+    tourney.finalists = pool.slice();
+    if (tourney.lastEliminated) tourney.podium.third = tourney.lastEliminated;
+    return showFinal();
+  }
+  tourney.three = pool.slice();
+  showPick3rd();
+}
+
+function showPick3rd() {
+  setStage("pick3rd");
+  $("#review-count").textContent = "Quedan 3";
+  $("#pick-stage").innerHTML = `
+    <h2 class="stage-title">🥉 Elige el 3er lugar</h2>
+    <p class="stage-sub muted">Toca el que quede tercero. Los otros 2 pasan a la final.</p>
+    <div class="vs-grid three">${tourney.three.map((m) => miniCard(m, "pick")).join("")}</div>`;
+}
+
+function showFinal() {
+  setStage("final");
+  $("#review-count").textContent = "FINAL";
+  $("#final-stage").innerHTML = `
+    <h2 class="stage-title">🥇 La final</h2>
+    <p class="stage-sub muted">¿Cuál te hizo reír más? Ese gana; el otro queda 2º.</p>
+    <div class="vs-grid two">${tourney.finalists.map((m) => miniCard(m, "win1")).join("")}</div>`;
+}
+
+function onStageClick(e) {
+  const view = e.target.closest("[data-view]");
+  if (view) { e.stopPropagation(); return openMeme(view.dataset.view); }
+  const pick = e.target.closest("[data-pick]");
+  if (pick) {
+    tourney.podium.third = tourney.three.find((m) => m.id === pick.dataset.pick);
+    tourney.finalists = tourney.three.filter((m) => m.id !== pick.dataset.pick);
+    return showFinal();
+  }
+  const w = e.target.closest("[data-win1]");
+  if (w) {
+    tourney.podium.first = tourney.finalists.find((m) => m.id === w.dataset.win1);
+    tourney.podium.second = tourney.finalists.find((m) => m.id !== w.dataset.win1);
+    return finishTournament();
+  }
+}
+$("#pick-stage").addEventListener("click", onStageClick);
+$("#final-stage").addEventListener("click", onStageClick);
+
+async function finishTournament() {
+  setStage("done");
+  $("#review-count").textContent = "";
+  const { first, second, third } = tourney.podium;
+  $("#review-done").innerHTML = `
+    <h2>🏆 Podio</h2>
+    <div class="podium">
+      ${first ? `<div class="pod p1"><span class="medal">🥇</span><b>${escapeHtml(first.userName || "anónimo")}</b><span class="pod-tag">1er lugar</span></div>` : ""}
+      ${second ? `<div class="pod p2"><span class="medal">🥈</span><b>${escapeHtml(second.userName || "anónimo")}</b><span class="pod-tag">2º</span></div>` : ""}
+      ${third ? `<div class="pod p3"><span class="medal">🥉</span><b>${escapeHtml(third.userName || "anónimo")}</b><span class="pod-tag">3º</span></div>` : ""}
+    </div>
+    <button class="big-btn">Volver a la biblioteca</button>`;
+  $("#review-done .big-btn").onclick = () => goLibrary();
+  if (first) showWin(first.userName);
+  await persistPodium();
+}
+
+async function persistPodium() {
+  const want = new Map();
+  const { first, second, third } = tourney.podium;
+  if (first) want.set(first.id, "first");
+  if (second) want.set(second.id, "second");
+  if (third) want.set(third.id, "third");
+  for (const m of MEMES) {
+    const v = want.get(m.id) || null;
+    if ((m.decision || null) !== v) { try { await store.update(m.id, { decision: v }); } catch (e) {} }
+  }
 }
 
 function showWin(name) {
@@ -666,6 +799,31 @@ function launchConfetti(ov) {
   }
   setTimeout(() => ov.querySelectorAll(".confetti").forEach((e) => e.remove()), 3000);
 }
+
+/* ============================================================
+   Contador regresivo (hasta DEADLINE, hora Pacífico)
+   ============================================================ */
+const DEADLINE_MS = new Date(DEADLINE).getTime();
+function tickCountdown() {
+  const diff = DEADLINE_MS - Date.now();
+  let text = "";
+  if (!isNaN(DEADLINE_MS)) {
+    if (diff <= 0) text = "¡TERMINADO!";
+    else {
+      const s = Math.floor(diff / 1000);
+      const pad = (n) => String(n).padStart(2, "0");
+      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+        m = Math.floor((s % 3600) / 60), sec = s % 60;
+      text = (d > 0 ? `${d}d ` : "") + `${pad(h)}:${pad(m)}:${pad(sec)}`;
+    }
+  }
+  document.querySelectorAll("[data-cd]").forEach((el) => {
+    el.textContent = text;
+    el.classList.toggle("cd-ended", diff <= 0);
+  });
+}
+setInterval(tickCountdown, 1000);
+tickCountdown();
 
 /* ============================================================
    9. Arranque
